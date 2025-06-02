@@ -1,0 +1,217 @@
+.vacations-container {
+  padding: 20px;
+  max-width: 900px;
+  margin: 0 auto;
+}
+
+.vacations-container h2 {
+  text-align: center;
+  color: #333;
+  margin-bottom: 30px;
+  font-size: 2em;
+}
+
+.vacation-form {
+  background-color: #f9f9f9;
+  padding: 25px;
+  border-radius: 10px;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+  margin-bottom: 30px;
+}
+
+.vacation-form h3 {
+  text-align: center;
+  color: #007bff;
+  margin-bottom: 20px;
+  font-size: 1.5em;
+}
+
+.form-group {
+  margin-bottom: 18px;
+}
+
+.form-group label {
+  display: block;
+  margin-bottom: 8px;
+  font-weight: bold;
+  color: #555;
+}
+
+.form-group input[type="datetime-local"],
+.form-group select,
+.form-group textarea {
+  width: 100%;
+  padding: 12px;
+  border: 1px solid #ccc;
+  border-radius: 6px;
+  font-size: 1em;
+  box-sizing: border-box;
+}
+
+.form-group textarea {
+  resize: vertical;
+  min-height: 80px;
+}
+
+.vacation-form button {
+  padding: 12px 20px;
+  border-radius: 6px;
+  font-size: 1.1em;
+  margin-right: 15px;
+}
+
+.vacation-form button.cancel-button {
+  background-color: #6c757d;
+}
+
+.vacation-form button.cancel-button:hover {
+  background-color: #5a6268;
+}
+
+.summary-section {
+  background-color: #e9f7ef;
+  border: 1px solid #d4edda;
+  border-radius: 10px;
+  padding: 25px;
+  margin-bottom: 30px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+}
+
+.summary-section h3 {
+  color: #28a745;
+  margin-top: 0;
+  font-size: 1.6em;
+}
+
+.summary-section p, .summary-section li {
+  font-size: 1.1em;
+  margin-bottom: 8px;
+}
+
+.summary-section h4 {
+  margin-top: 20px;
+  margin-bottom: 10px;
+  color: #555;
+  font-size: 1.3em;
+}
+
+.summary-section ul {
+  list-style: none;
+  padding: 0;
+}
+
+.summary-section li {
+  background-color: #f0fdf4;
+  padding: 10px 15px;
+  border-radius: 5px;
+  margin-bottom: 5px;
+  border-left: 4px solid #28a745;
+}
+
+.vacations-list {
+  list-style: none;
+  padding: 0;
+}
+
+.vacation-item {
+  background-color: #fff;
+  border: 1px solid #e0e0e0;
+  border-radius: 10px;
+  margin-bottom: 15px;
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.08);
+  transition: transform 0.2s ease-in-out;
+}
+
+.vacation-item:hover {
+  transform: translateY(-3px);
+}
+
+.vacation-details strong {
+  font-size: 1.3em;
+  color: #007bff;
+  margin-bottom: 10px;
+  display: block;
+}
+
+.vacation-details p {
+  margin: 5px 0;
+  font-size: 0.95em;
+  color: #444;
+}
+
+.vacation-notes {
+  font-style: italic;
+  color: #666;
+  border-top: 1px dashed #eee;
+  padding-top: 10px;
+  margin-top: 10px;
+}
+
+.vacation-actions {
+  display: flex;
+  gap: 10px;
+  justify-content: flex-end;
+  margin-top: 10px;
+}
+
+.vacation-actions button {
+  padding: 8px 15px;
+  border-radius: 5px;
+  font-size: 0.9em;
+}
+
+.vacation-actions .edit-button {
+  background-color: #ffc107;
+  color: #333;
+}
+
+.vacation-actions .edit-button:hover {
+  background-color: #e0a800;
+}
+
+.vacation-actions .delete-button {
+  background-color: #dc3545;
+  color: white;
+}
+
+.vacation-actions .delete-button:hover {
+  background-color: #c82333;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+  .vacations-container {
+    padding: 15px;
+  }
+
+  .vacation-form, .summary-section, .vacation-item {
+    padding: 15px;
+  }
+
+  .vacation-form h3 {
+    font-size: 1.3em;
+  }
+
+  .form-group input, .form-group select, .form-group textarea {
+    padding: 10px;
+  }
+
+  .vacation-form button {
+    width: 100%;
+    margin-right: 0;
+    margin-bottom: 10px;
+  }
+
+  .vacation-actions {
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .vacation-actions button {
+    width: 100%;
+  }
+}

@@ -1,0 +1,24 @@
+.footer-container {
+  background-color: #282c34;
+  color: white;
+  text-align: center;
+  padding: 15px 20px;
+  box-shadow: 0 -2px 5px rgba(0, 0, 0, 0.2);
+  margin-top: auto; /* Pushes the footer to the bottom */
+}
+
+.footer-container p {
+  margin: 0;
+  font-size: 0.9em;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+  .footer-container {
+    padding: 10px 15px;
+  }
+
+  .footer-container p {
+    font-size: 0.8em;
+  }
+}

@@ -1,0 +1,77 @@
+.header-container {
+  background-color: #282c34;
+  color: white;
+  padding: 15px 20px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
+  flex-wrap: wrap; /* Allow items to wrap on smaller screens */
+}
+
+.header-left h1 {
+  margin: 0;
+  font-size: 1.8em;
+  white-space: nowrap; /* Prevent title from wrapping */
+}
+
+.header-nav {
+  display: flex;
+  gap: 15px;
+  flex-wrap: wrap; /* Allow buttons to wrap */
+  justify-content: center; /* Center buttons when wrapped */
+}
+
+.header-nav .nav-button {
+  background-color: #007bff;
+  color: white;
+  padding: 8px 15px;
+  border: none;
+  border-radius: 5px;
+  cursor: pointer;
+  font-size: 0.95em;
+  transition: background-color 0.3s ease;
+}
+
+.header-nav .nav-button:hover {
+  background-color: #0056b3;
+}
+
+.header-nav .sign-out-button {
+  background-color: #dc3545;
+}
+
+.header-nav .sign-out-button:hover {
+  background-color: #c82333;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+  .header-container {
+    flex-direction: column;
+    text-align: center;
+    gap: 10px;
+  }
+
+  .header-left h1 {
+    font-size: 1.5em;
+  }
+
+  .header-nav {
+    width: 100%;
+    justify-content: center;
+    gap: 10px;
+  }
+
+  .header-nav .nav-button {
+    padding: 10px 12px;
+    font-size: 0.9em;
+  }
+}
+
+@media (max-width: 480px) {
+  .header-nav .nav-button {
+    width: calc(50% - 10px); /* Two buttons per row */
+    box-sizing: border-box;
+  }
+}
