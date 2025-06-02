@@ -1,12 +1,15 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { supabase } from '../supabaseClient';
-import { parseISO, format, differenceInMinutes } from 'date-fns';
+import { parseISO, format, differenceInMinutes, startOfMonth, endOfMonth } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import PropTypes from 'prop-types';
 import './Vacations.css';
 
 function Vacations({ session }) {
+  // vacations: Liste des vacations actuellement affichées (filtrées)
   const [vacations, setVacations] = useState([]);
+  // allVacations: Liste complète de toutes les vacations récupérées de la base de données
+  const [allVacations, setAllVacations] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [form, setForm] = useState({
@@ -16,59 +19,124 @@ function Vacations({ session }) {
     notes: '',
   });
   const [editingVacationId, setEditingVacationId] = useState(null);
-  const [hourlyRates, setHourlyRates] = useState({});
+  // hourlyRates: Maintenant un objet simple { baseRate: X, garde: Y, astreinte: Z, intervention: W } pour le grade sélectionné de l'utilisateur
+  const [hourlyRates, setHourlyRates] = useState({ baseRate: 0, garde: 0, astreinte: 0, intervention: 0 });
+  // selectedMonth: État pour le mois sélectionné dans le filtre (format 'YYYY-MM' ou 'all')
+  const [selectedMonth, setSelectedMonth] = useState('all');
+  // availableMonths: Liste des mois uniques présents dans les vacations pour le sélecteur
+  const [availableMonths, setAvailableMonths] = useState([]);
 
   // Création d'une référence pour le formulaire
   const formRef = useRef(null);
 
   const activityTypes = ['garde', 'astreinte', 'intervention'];
 
+  // Effet pour récupérer toutes les vacations et les taux horaires au chargement du composant
   useEffect(() => {
     if (session?.user?.id) {
-      fetchVacations();
-      fetchHourlyRates();
+      fetchAllVacations();
+      fetchUserHourlyRates(); // Appel de la nouvelle fonction pour les taux
     } else {
       setLoading(false);
       setError('Veuillez vous connecter pour gérer les vacations.');
     }
   }, [session]);
 
-  const fetchVacations = async () => {
+  // Effet pour filtrer les vacations et générer les mois disponibles lorsque allVacations ou selectedMonth changent
+  useEffect(() => {
+    if (allVacations.length > 0) {
+      // 1. Générer les mois uniques pour le sélecteur de filtre
+      const months = new Set();
+      allVacations.forEach(vac => {
+        const date = parseISO(vac.start_time);
+        months.add(format(date, 'yyyy-MM'));
+      });
+      // Trier les mois du plus ancien au plus récent
+      const sortedMonths = Array.from(months).sort((a, b) => new Date(a) - new Date(b));
+      setAvailableMonths(sortedMonths);
+
+      // 2. Filtrer les vacations pour l'affichage
+      const filtered = allVacations.filter(vac => {
+        if (selectedMonth === 'all') {
+          return true; // Afficher toutes les vacations si 'all' est sélectionné
+        }
+        const vacDate = parseISO(vac.start_time);
+        const [year, month] = selectedMonth.split('-').map(Number);
+        // Comparer l'année et le mois de la vacation avec le mois sélectionné
+        return vacDate.getFullYear() === year && (vacDate.getMonth() + 1) === month;
+      });
+      setVacations(filtered);
+    } else {
+      setVacations([]); // Aucune vacation à afficher si allVacations est vide
+      setAvailableMonths([]);
+    }
+  }, [allVacations, selectedMonth]);
+
+  // Fonction pour récupérer toutes les vacations de l'utilisateur
+  const fetchAllVacations = async () => {
     setLoading(true);
     setError(null);
     const { data, error } = await supabase
       .from('vacations')
       .select('*')
       .eq('user_id', session.user.id)
-      .order('start_time', { ascending: false });
+      .order('start_time', { ascending: false }); // Ordonner par date de début
 
     if (error) {
       console.error('Erreur lors du chargement des vacations:', error);
       setError('Impossible de charger les vacations.');
+      setAllVacations([]);
     } else {
-      setVacations(data);
+      setAllVacations(data); // Stocker toutes les vacations
     }
     setLoading(false);
   };
 
-  const fetchHourlyRates = async () => {
-    const { data, error } = await supabase
+  // Nouvelle fonction pour récupérer les taux horaires spécifiques au grade de l'utilisateur
+  const fetchUserHourlyRates = async () => {
+    if (!session?.user?.id) return;
+
+    // 1. Récupérer le grade sélectionné par l'utilisateur
+    const { data: profileData, error: profileError } = await supabase
+      .from('profiles')
+      .select('selected_grade')
+      .eq('id', session.user.id)
+      .single();
+
+    let userGrade = 'Pompier'; // Grade par défaut si non trouvé
+    if (profileData) {
+      userGrade = profileData.selected_grade;
+    } else if (profileError && profileError.code !== 'PGRST116') { // PGRST116 = no rows found
+      console.error('Erreur lors du chargement du profil utilisateur:', profileError);
+      setError('Impossible de charger votre grade. Utilisation du grade par défaut.');
+    }
+
+    // 2. Récupérer TOUS les paramètres (taux de base et pourcentages) pour ce grade et cet utilisateur
+    const { data: settingsData, error: settingsError } = await supabase
       .from('settings')
       .select('activity_type, hourly_rate')
-      .eq('user_id', session.user.id);
+      .eq('user_id', session.user.id)
+      .eq('grade', userGrade); // Filtrer par le grade de l'utilisateur
 
-    if (error) {
-      console.error('Erreur lors du chargement des taux horaires:', error);
+    if (settingsError) {
+      console.error('Erreur lors du chargement des taux horaires pour le grade:', settingsError);
+      setError('Impossible de charger les taux horaires pour votre grade. Veuillez vérifier les paramètres.');
       setHourlyRates({
+        baseRate: 0,
         garde: 0,
         astreinte: 0,
         intervention: 0,
       });
     } else {
-      const rates = data.reduce((acc, setting) => {
-        acc[setting.activity_type] = parseFloat(setting.hourly_rate);
-        return acc;
-      }, {});
+      const rates = { baseRate: 0, garde: 0, astreinte: 0, intervention: 0 };
+      settingsData.forEach(setting => {
+        if (setting.activity_type === 'base_rate') {
+          rates.baseRate = parseFloat(setting.hourly_rate);
+        } else {
+          // Les autres activity_type sont des pourcentages
+          rates[setting.activity_type] = parseFloat(setting.hourly_rate);
+        }
+      });
       setHourlyRates(rates);
     }
   };
@@ -77,20 +145,34 @@ function Vacations({ session }) {
     setForm({ ...form, [e.target.name]: e.target.value });
   };
 
+  // Gère le changement de sélection du mois de filtre
+  const handleMonthFilterChange = (e) => {
+    setSelectedMonth(e.target.value);
+  };
+
   const calculateDurationAndAmount = (start, end, type) => {
     const startDate = parseISO(start);
     const endDate = parseISO(end);
 
     if (isNaN(startDate.getTime()) || isNaN(endDate.getTime()) || endDate <= startDate) {
-      return { duration_minutes: 0, total_amount: 0 };
+      return { duration_minutes: 0, total_amount: 0, hourly_rate_applied: 0 };
     }
 
     const durationMinutes = differenceInMinutes(endDate, startDate);
     const hours = durationMinutes / 60;
-    const rate = hourlyRates[type] || 0;
-    const totalAmount = hours * rate;
 
-    return { duration_minutes: Math.round(durationMinutes), total_amount: parseFloat(totalAmount.toFixed(2)) };
+    // Calculer le taux horaire réel basé sur le taux de base et le pourcentage de l'activité
+    const baseRate = hourlyRates.baseRate || 0;
+    const percentage = hourlyRates[type] || 0; // Récupérer le pourcentage pour le type d'activité
+    const actualHourlyRate = baseRate * (percentage / 100); // Calcul du taux réel
+
+    const totalAmount = hours * actualHourlyRate;
+
+    return {
+      duration_minutes: Math.round(durationMinutes),
+      total_amount: parseFloat(totalAmount.toFixed(2)),
+      hourly_rate_applied: parseFloat(actualHourlyRate.toFixed(2)) // Stocker le taux calculé
+    };
   };
 
   const handleSubmit = async (e) => {
@@ -104,7 +186,8 @@ function Vacations({ session }) {
       return;
     }
 
-    const { duration_minutes, total_amount } = calculateDurationAndAmount(
+    // Récupérer le taux horaire appliqué directement depuis la fonction de calcul
+    const { duration_minutes, total_amount, hourly_rate_applied } = calculateDurationAndAmount(
       form.start_time,
       form.end_time,
       form.activity_type
@@ -116,12 +199,10 @@ function Vacations({ session }) {
       return;
     }
 
-    const currentRate = hourlyRates[form.activity_type] || 0;
-
     const vacationData = {
       ...form,
       duration_minutes,
-      hourly_rate_applied: currentRate,
+      hourly_rate_applied, // Utiliser le taux calculé
       total_amount,
       user_id: session.user.id,
     };
@@ -152,7 +233,7 @@ function Vacations({ session }) {
         notes: '',
       });
       setEditingVacationId(null);
-      fetchVacations();
+      fetchAllVacations(); // Re-fetch all vacations to update the list and filter
     }
     setLoading(false);
   };
@@ -194,11 +275,12 @@ function Vacations({ session }) {
       console.error('Erreur lors de la suppression de la vacation:', error);
       setError('Impossible de supprimer la vacation.');
     } else {
-      fetchVacations();
+      fetchAllVacations(); // Re-fetch all vacations to update the list and filter
     }
     setLoading(false);
   };
 
+  // Le résumé des totaux est maintenant basé sur la liste 'vacations' (filtrée)
   const getTotalSummary = () => {
     const summary = {
       totalHours: 0,
@@ -309,9 +391,26 @@ function Vacations({ session }) {
             </ul>
           </div>
 
+          {/* Nouveau sélecteur de filtre par mois */}
+          <div className="filter-section">
+            <label htmlFor="month-filter">Filtrer par mois:</label>
+            <select
+              id="month-filter"
+              value={selectedMonth}
+              onChange={handleMonthFilterChange}
+            >
+              <option value="all">Tous les mois</option>
+              {availableMonths.map(month => (
+                <option key={month} value={month}>
+                  {format(parseISO(month + '-01'), 'MMMM yyyy', { locale: fr })}
+                </option>
+              ))}
+            </select>
+          </div>
+
           <h3>Liste des Vacations</h3>
           {vacations.length === 0 ? (
-            <p>Aucune vacation enregistrée pour le moment.</p>
+            <p>Aucune vacation enregistrée pour le moment {selectedMonth !== 'all' ? `pour le mois de ${format(parseISO(selectedMonth + '-01'), 'MMMM yyyy', { locale: fr })}` : ''}.</p>
           ) : (
             <ul className="vacations-list">
               {vacations.map((vac) => (

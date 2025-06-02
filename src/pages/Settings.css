@@ -1,6 +1,6 @@
 .settings-container {
   padding: 20px;
-  max-width: 700px;
+  max-width: 800px;
   margin: 0 auto;
 }
 
@@ -8,7 +8,22 @@
   text-align: center;
   color: #333;
   margin-bottom: 30px;
-  font-size: 2em;
+  font-size: 2.2em;
+}
+
+.settings-section {
+  background-color: #f9f9f9;
+  padding: 25px;
+  border-radius: 10px;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+  margin-bottom: 30px;
+}
+
+.settings-section h3 {
+  text-align: center;
+  color: #007bff;
+  margin-bottom: 20px;
+  font-size: 1.6em;
 }
 
 .settings-form {
@@ -19,18 +34,27 @@
   margin-bottom: 30px;
 }
 
-.settings-form .form-group {
+.settings-form h3 {
+  text-align: center;
+  color: #28a745;
+  margin-bottom: 20px;
+  font-size: 1.6em;
+}
+
+.form-group {
   margin-bottom: 20px;
 }
 
-.settings-form label {
+.form-group label {
   display: block;
   margin-bottom: 8px;
   font-weight: bold;
   color: #555;
 }
 
-.settings-form input[type="number"] {
+.form-group input[type="number"],
+.form-group input[type="text"],
+.form-group select {
   width: 100%;
   padding: 12px;
   border: 1px solid #ccc;
@@ -39,16 +63,27 @@
   box-sizing: border-box;
 }
 
-.settings-form button {
+.settings-form button,
+.add-grade-section button {
   width: 100%;
   padding: 12px 20px;
   border-radius: 6px;
   font-size: 1.1em;
   background-color: #28a745; /* Green for save button */
+  color: white;
+  border: none;
+  cursor: pointer;
+  transition: background-color 0.3s ease;
 }
 
-.settings-form button:hover {
+.settings-form button:hover,
+.add-grade-section button:hover {
   background-color: #218838;
+}
+
+.settings-form button:disabled {
+  background-color: #cccccc;
+  cursor: not-allowed;
 }
 
 .success-message {
@@ -62,22 +97,126 @@
   font-size: 1.1em;
 }
 
+.error-message {
+  text-align: center;
+  padding: 15px;
+  background-color: #f8d7da;
+  color: #721c24;
+  border: 1px solid #f5c6cb;
+  border-radius: 4px;
+  margin-bottom: 20px;
+  font-size: 1.1em;
+}
+
+.info-message {
+  text-align: center;
+  padding: 10px;
+  background-color: #e2e3e5;
+  color: #383d41;
+  border: 1px solid #d6d8db;
+  border-radius: 4px;
+  margin-top: 15px;
+  font-size: 0.95em;
+}
+
+/* Styles spécifiques pour la gestion des grades */
+.user-grade-selection {
+  background-color: #e0f7fa; /* Light blue */
+  border: 1px solid #b2ebf2;
+}
+
+.user-grade-selection h3 {
+  color: #00796b; /* Darker teal */
+}
+
+.add-grade-section {
+  background-color: #fff3e0; /* Light orange */
+  border: 1px solid #ffe0b2;
+}
+
+.add-grade-section h3 {
+  color: #ef6c00; /* Darker orange */
+}
+
+.add-grade-input-group {
+  display: flex;
+  gap: 10px;
+}
+
+.add-grade-input-group input {
+  flex-grow: 1;
+}
+
+.add-grade-input-group button {
+  width: auto;
+  padding: 12px 25px;
+  white-space: nowrap;
+  background-color: #007bff; /* Blue for add grade button */
+}
+
+.add-grade-input-group button:hover {
+  background-color: #0056b3;
+}
+
+.grade-rates-section {
+  border: 1px solid #e0e0e0;
+  border-radius: 8px;
+  padding: 20px;
+  margin-bottom: 25px;
+  background-color: #ffffff;
+  box-shadow: inset 0 1px 3px rgba(0,0,0,0.05);
+}
+
+.grade-rates-section h4 {
+  color: #333;
+  margin-top: 0;
+  margin-bottom: 20px;
+  font-size: 1.4em;
+  border-bottom: 2px solid #eee;
+  padding-bottom: 10px;
+}
+
+.grade-rates-section h4 span {
+  color: #007bff;
+  font-weight: bold;
+}
+
 /* Responsive adjustments */
 @media (max-width: 768px) {
   .settings-container {
     padding: 15px;
   }
 
-  .settings-form {
+  .settings-section, .settings-form {
     padding: 15px;
   }
 
-  .settings-form input[type="number"] {
+  .settings-container h2 {
+    font-size: 1.8em;
+  }
+
+  .settings-section h3, .settings-form h3 {
+    font-size: 1.4em;
+  }
+
+  .form-group input[type="number"],
+  .form-group input[type="text"],
+  .form-group select {
     padding: 10px;
   }
 
-  .settings-form button {
+  .settings-form button,
+  .add-grade-section button {
     padding: 10px 15px;
     font-size: 1em;
+  }
+
+  .add-grade-input-group {
+    flex-direction: column;
+    gap: 15px;
+  }
+
+  .add-grade-input-group button {
+    width: 100%;
   }
 }

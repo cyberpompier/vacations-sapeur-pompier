@@ -58,6 +58,15 @@
   border-radius: 6px;
   font-size: 1.1em;
   margin-right: 15px;
+  background-color: #007bff;
+  color: white;
+  border: none;
+  cursor: pointer;
+  transition: background-color 0.3s ease;
+}
+
+.vacation-form button:hover {
+  background-color: #0056b3;
 }
 
 .vacation-form button.cancel-button {
@@ -107,6 +116,42 @@
   margin-bottom: 5px;
   border-left: 4px solid #28a745;
 }
+
+/* Styles pour le nouveau filtre par mois */
+.filter-section {
+  margin-bottom: 30px;
+  padding: 15px 25px;
+  background-color: #f0f8ff;
+  border: 1px solid #cce5ff;
+  border-radius: 10px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+  display: flex;
+  align-items: center;
+  gap: 15px;
+}
+
+.filter-section label {
+  font-weight: bold;
+  color: #007bff;
+  font-size: 1.1em;
+}
+
+.filter-section select {
+  padding: 10px 15px;
+  border: 1px solid #a0d9ff;
+  border-radius: 6px;
+  font-size: 1em;
+  background-color: #fff;
+  cursor: pointer;
+  outline: none;
+  transition: border-color 0.3s ease, box-shadow 0.3s ease;
+}
+
+.filter-section select:focus {
+  border-color: #007bff;
+  box-shadow: 0 0 0 3px rgba(0, 123, 255, 0.25);
+}
+
 
 .vacations-list {
   list-style: none;
@@ -162,6 +207,15 @@
   padding: 8px 15px;
   border-radius: 5px;
   font-size: 0.9em;
+  background-color: #007bff;
+  color: white;
+  border: none;
+  cursor: pointer;
+  transition: background-color 0.3s ease;
+}
+
+.vacation-actions button:hover {
+  background-color: #0056b3;
 }
 
 .vacation-actions .edit-button {
@@ -188,7 +242,7 @@
     padding: 15px;
   }
 
-  .vacation-form, .summary-section, .vacation-item {
+  .vacation-form, .summary-section, .vacation-item, .filter-section {
     padding: 15px;
   }
 
@@ -212,6 +266,16 @@
   }
 
   .vacation-actions button {
+    width: 100%;
+  }
+
+  .filter-section {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 10px;
+  }
+
+  .filter-section select {
     width: 100%;
   }
 }
