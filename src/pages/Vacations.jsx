@@ -1,11 +1,11 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { supabase } from '../supabaseClient';
 import { parseISO, format, differenceInMinutes } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import PropTypes from 'prop-types';
 import './Vacations.css';
 
-function Vacations({ session }) { // Accept session as a prop
+function Vacations({ session }) {
   const [vacations, setVacations] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -18,17 +18,20 @@ function Vacations({ session }) { // Accept session as a prop
   const [editingVacationId, setEditingVacationId] = useState(null);
   const [hourlyRates, setHourlyRates] = useState({});
 
+  // Création d'une référence pour le formulaire
+  const formRef = useRef(null);
+
   const activityTypes = ['garde', 'astreinte', 'intervention'];
 
   useEffect(() => {
-    if (session?.user?.id) { // Fetch data only if user is logged in
+    if (session?.user?.id) {
       fetchVacations();
       fetchHourlyRates();
     } else {
       setLoading(false);
       setError('Veuillez vous connecter pour gérer les vacations.');
     }
-  }, [session]); // Re-run when session changes
+  }, [session]);
 
   const fetchVacations = async () => {
     setLoading(true);
@@ -36,7 +39,7 @@ function Vacations({ session }) { // Accept session as a prop
     const { data, error } = await supabase
       .from('vacations')
       .select('*')
-      .eq('user_id', session.user.id) // Filter by user_id
+      .eq('user_id', session.user.id)
       .order('start_time', { ascending: false });
 
     if (error) {
@@ -52,7 +55,7 @@ function Vacations({ session }) { // Accept session as a prop
     const { data, error } = await supabase
       .from('settings')
       .select('activity_type, hourly_rate')
-      .eq('user_id', session.user.id); // Filter by user_id
+      .eq('user_id', session.user.id);
 
     if (error) {
       console.error('Erreur lors du chargement des taux horaires:', error);
@@ -120,7 +123,7 @@ function Vacations({ session }) { // Accept session as a prop
       duration_minutes,
       hourly_rate_applied: currentRate,
       total_amount,
-      user_id: session.user.id, // Use session from props
+      user_id: session.user.id,
     };
 
     let response;
@@ -129,7 +132,7 @@ function Vacations({ session }) { // Accept session as a prop
         .from('vacations')
         .update(vacationData)
         .eq('id', editingVacationId)
-        .eq('user_id', session.user.id) // Ensure user can only update their own
+        .eq('user_id', session.user.id)
         .select();
     } else {
       response = await supabase
@@ -162,6 +165,10 @@ function Vacations({ session }) { // Accept session as a prop
       end_time: format(parseISO(vacation.end_time), "yyyy-MM-dd'T'HH:mm"),
       notes: vacation.notes,
     });
+    // Faire défiler le formulaire dans la vue
+    if (formRef.current) {
+      formRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
   };
 
   const handleDelete = async (id) => {
@@ -181,7 +188,7 @@ function Vacations({ session }) { // Accept session as a prop
       .from('vacations')
       .delete()
       .eq('id', id)
-      .eq('user_id', session.user.id); // Ensure user can only delete their own
+      .eq('user_id', session.user.id);
 
     if (error) {
       console.error('Erreur lors de la suppression de la vacation:', error);
@@ -230,7 +237,8 @@ function Vacations({ session }) { // Accept session as a prop
 
       {session?.user?.id ? (
         <>
-          <form onSubmit={handleSubmit} className="vacation-form">
+          {/* Ajout de la référence au formulaire */}
+          <form onSubmit={handleSubmit} className="vacation-form" ref={formRef}>
             <h3>{editingVacationId ? 'Modifier une vacation' : 'Ajouter une nouvelle vacation'}</h3>
             <div className="form-group">
               <label htmlFor="activity_type">Type d'activité:</label>
