@@ -8,8 +8,21 @@ function UserProfile({ session }) {
   const [nom, setNom] = useState('');
   const [prenom, setPrenom] = useState('');
   const [caserneAffectation, setCaserneAffectation] = useState('');
-  const [grade, setGrade] = useState('');
+  const [grade, setGrade] = useState(''); // This will now hold the selected grade
   const [photoUrl, setPhotoUrl] = useState('');
+
+  // Define the list of available grades
+  const gradesOptions = [
+    'Sapeur',
+    'Caporal',
+    'Caporal-chef',
+    'Sergent',
+    'Sergent-chef',
+    'Adjudant',
+    'Adjudant-chef',
+    'Lieutenant',
+    'Capitaine',
+  ];
 
   useEffect(() => {
     getProfile();
@@ -34,7 +47,8 @@ function UserProfile({ session }) {
         setNom(data.nom);
         setPrenom(data.prenom);
         setCaserneAffectation(data.caserne_affectation);
-        setGrade(data.grade);
+        // Set the grade, ensuring it's one of the valid options or default to empty
+        setGrade(gradesOptions.includes(data.grade) ? data.grade : '');
         setPhotoUrl(data.photo_url);
       }
     } catch (error) {
@@ -56,7 +70,7 @@ function UserProfile({ session }) {
         nom,
         prenom,
         caserne_affectation: caserneAffectation,
-        grade,
+        grade, // Use the selected grade from the dropdown
         photo_url: photoUrl,
         updated_at: new Date().toISOString(),
       };
@@ -110,13 +124,19 @@ function UserProfile({ session }) {
         </div>
         <div className="form-group">
           <label htmlFor="grade">Grade:</label>
-          <input
+          <select
             id="grade"
-            type="text"
-            value={grade || ''}
+            value={grade || ''} // Ensure value is controlled
             onChange={(e) => setGrade(e.target.value)}
             disabled={loading}
-          />
+          >
+            <option value="">Sélectionnez un grade</option> {/* Default empty option */}
+            {gradesOptions.map((optionGrade) => (
+              <option key={optionGrade} value={optionGrade}>
+                {optionGrade}
+              </option>
+            ))}
+          </select>
         </div>
         <div className="form-group">
           <label htmlFor="photo_url">URL Photo:</label>

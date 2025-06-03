@@ -157,24 +157,30 @@ function Settings({ session }) {
     }
 
     const updates = [];
-    allGrades.forEach(grade => {
-      // Ajouter l'entrée pour le taux de base du grade
+    // Only save the rates for the user's selected grade if it exists
+    if (userSelectedGrade && hourlyRates[userSelectedGrade]) {
+      // Add entry for the base rate of the selected grade
       updates.push({
         user_id: session.user.id,
-        grade: grade,
-        activity_type: 'base_rate', // Type d'activité spécifique pour le taux de base
-        hourly_rate: hourlyRates[grade]?.base_rate || 0,
+        grade: userSelectedGrade,
+        activity_type: 'base_rate', // Specific activity type for base rate
+        hourly_rate: hourlyRates[userSelectedGrade]?.base_rate || 0,
       });
-      // Ajouter les entrées pour les pourcentages de chaque type d'activité
+      // Add entries for percentages of each activity type for the selected grade
       activityTypes.forEach(type => {
         updates.push({
           user_id: session.user.id,
-          grade: grade,
+          grade: userSelectedGrade,
           activity_type: type, // 'garde', 'astreinte', 'intervention'
-          hourly_rate: hourlyRates[grade]?.[type] || 0, // C'est le pourcentage
+          hourly_rate: hourlyRates[userSelectedGrade]?.[type] || 0, // This is the percentage
         });
       });
-    });
+    } else {
+      setError('Aucun grade sélectionné ou taux non définis pour le grade actuel.');
+      setLoading(false);
+      return;
+    }
+
     console.log('Payload des mises à jour:', updates); // Log du tableau de données à envoyer
 
     // Utilisation de upsert avec la contrainte onConflict pour mettre à jour ou insérer
@@ -276,47 +282,47 @@ function Settings({ session }) {
 
           {/* Section pour gérer les taux horaires par grade */}
           <form onSubmit={handleSubmitRates} className="settings-form">
-            <h3>Gérer les Taux Horaires par Grade</h3>
-            {allGrades.length === 0 ? (
-              <p className="info-message">Aucun grade défini. Ajoutez un grade ci-dessus pour commencer à définir les taux.</p>
-            ) : (
-              allGrades.map(grade => (
-                <div key={grade} className="grade-rates-section">
-                  <h4>Taux pour le grade: <span>{grade}</span></h4>
-                  {/* Champ pour le taux horaire de base */}
-                  <div className="form-group">
-                    <label htmlFor={`${grade}-base_rate`}>Taux horaire de base (€/heure):</label>
+            <h3>Gérer les Taux Horaires de Mon Grade</h3>
+            {userSelectedGrade && hourlyRates[userSelectedGrade] ? (
+              <div key={userSelectedGrade} className="grade-rates-section">
+                <h4>Taux pour le grade: <span>{userSelectedGrade}</span></h4>
+                {/* Champ pour le taux horaire de base */}
+                <div className="form-group">
+                  <label htmlFor={`${userSelectedGrade}-base_rate`}>Taux horaire de base (€/heure):</label>
+                  <input
+                    type="number"
+                    id={`${userSelectedGrade}-base_rate`}
+                    name={`${userSelectedGrade}-base_rate`}
+                    value={hourlyRates[userSelectedGrade]?.base_rate || 0}
+                    onChange={(e) => handleRateChange(userSelectedGrade, 'base_rate', e.target.value)}
+                    step="0.01"
+                    min="0"
+                    required
+                  />
+                </div>
+                {/* Champs pour les pourcentages des activités */}
+                {activityTypes.map((type) => (
+                  <div className="form-group" key={`${userSelectedGrade}-${type}`}>
+                    <label htmlFor={`${userSelectedGrade}-${type}`}>Pourcentage {type.charAt(0).toUpperCase() + type.slice(1)} (%):</label>
                     <input
                       type="number"
-                      id={`${grade}-base_rate`}
-                      name={`${grade}-base_rate`}
-                      value={hourlyRates[grade]?.base_rate || 0}
-                      onChange={(e) => handleRateChange(grade, 'base_rate', e.target.value)}
-                      step="0.01"
+                      id={`${userSelectedGrade}-${type}`}
+                      name={`${userSelectedGrade}-${type}`}
+                      value={hourlyRates[userSelectedGrade]?.[type] || 0}
+                      onChange={(e) => handleRateChange(userSelectedGrade, type, e.target.value)}
+                      step="1"
                       min="0"
                       required
                     />
                   </div>
-                  {/* Champs pour les pourcentages des activités */}
-                  {activityTypes.map((type) => (
-                    <div className="form-group" key={`${grade}-${type}`}>
-                      <label htmlFor={`${grade}-${type}`}>Pourcentage {type.charAt(0).toUpperCase() + type.slice(1)} (%):</label>
-                      <input
-                        type="number"
-                        id={`${grade}-${type}`}
-                        name={`${grade}-${type}`}
-                        value={hourlyRates[grade]?.[type] || 0}
-                        onChange={(e) => handleRateChange(grade, type, e.target.value)}
-                        step="1" // Les pourcentages sont généralement des nombres entiers
-                        min="0"
-                        required
-                      />
-                    </div>
-                  ))}
-                </div>
-              ))
+                ))}
+              </div>
+            ) : (
+              <p className="info-message">
+                Veuillez sélectionner votre grade ci-dessus pour gérer ses taux, ou ajoutez un nouveau grade si le vôtre n'est pas listé.
+              </p>
             )}
-            <button type="submit" disabled={allGrades.length === 0}>Sauvegarder tous les taux</button>
+            <button type="submit" disabled={!userSelectedGrade || !hourlyRates[userSelectedGrade]}>Sauvegarder les taux de mon grade</button>
           </form>
         </>
       ) : (
