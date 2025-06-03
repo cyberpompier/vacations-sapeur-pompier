@@ -226,7 +226,9 @@ function Vacations({ session }) {
       setAllVacations([]);
     } else {
       // Re-calculate duration and amount for 'garde' vacations based on current interventions
-      const processedVacations = data.map(vac => {
+      const processedVacations = await Promise.all(data.map(async (vac) => {
+        let processedVac = { ...vac };
+
         if (vac.activity_type === 'garde') {
           // Ensure allInterventions is available here.
           // This is why fetchAllInterventions must complete before this.
@@ -236,16 +238,61 @@ function Vacations({ session }) {
             vac.activity_type,
             allInterventions // Pass the state here
           );
-          return {
-            ...vac,
+          processedVac = {
+            ...processedVac,
             duration_minutes,
             total_amount,
             hourly_rate_applied,
             intervention_count, // Add the new count
           };
+
+          // --- NEW LOGIC FOR OVERLAPPING USERS ---
+          const vacStartTime = typeof vac.start_time === 'string' && vac.start_time.trim() !== '' ? parseISO(vac.start_time) : null;
+          const vacEndTime = typeof vac.end_time === 'string' && vac.end_time.trim() !== '' ? parseISO(vac.end_time) : null;
+
+          if (vacStartTime && vacEndTime && !isNaN(vacStartTime.getTime()) && !isNaN(vacEndTime.getTime())) {
+            console.log('Checking for overlapping vacations for:', vac.id, 'from', vac.start_time, 'to', vac.end_time);
+            const { data: overlappingVacations, error: overlapError } = await supabase
+              .from('vacations')
+              .select('user_id')
+              .neq('user_id', session.user.id) // Exclude current user
+              .eq('activity_type', 'garde') // Only other 'garde' activities
+              .filter('start_time', 'lt', vac.end_time) // Starts before current vac ends
+              .filter('end_time', 'gt', vac.start_time); // Ends after current vac starts
+
+            if (overlapError) {
+              console.error('Error fetching overlapping vacations:', overlapError);
+              processedVac.overlapping_users = []; // Default to empty
+            } else {
+              console.log('Raw overlapping vacations data:', overlappingVacations);
+              const uniqueUserIds = [...new Set(overlappingVacations.map(ov => ov.user_id))];
+              console.log('Unique overlapping user IDs:', uniqueUserIds);
+
+              if (uniqueUserIds.length > 0) {
+                const { data: overlappingProfiles, error: profilesError } = await supabase
+                  .from('profiles')
+                  .select('id, nom, prenom, photo_url') // Changed 'username' to 'nom, prenom'
+                  .in('id', uniqueUserIds);
+
+                if (profilesError) {
+                  console.error('Error fetching overlapping profiles:', profilesError);
+                  processedVac.overlapping_users = [];
+                } else {
+                  console.log('Overlapping profiles data:', overlappingProfiles);
+                  processedVac.overlapping_users = overlappingProfiles || [];
+                }
+              } else {
+                processedVac.overlapping_users = [];
+              }
+            }
+          } else {
+            processedVac.overlapping_users = []; // Invalid date, no overlapping users
+            console.warn('Invalid start_time or end_time for vacation, skipping overlapping user check:', vac.id, vac.start_time, vac.end_time);
+          }
         }
-        return vac;
-      });
+        console.log('Processed vacation with overlapping users:', processedVac);
+        return processedVac;
+      }));
       setAllVacations(processedVacations); // Stocker toutes les vacations (potentiellement recalculées)
     }
   };
@@ -342,8 +389,7 @@ function Vacations({ session }) {
 
     const baseRate = hourlyRates.baseRate || 0;
 
-    // Declare intervention_count here so it's accessible in both branches
-    let intervention_count = 0; 
+    let intervention_count = 0; // Declare intervention_count here
 
     // Helper pour obtenir le taux horaire réel pour un type d'activité donné (garde ou astreinte)
     const getActualHourlyRate = (activityType) => {
@@ -750,6 +796,25 @@ function Vacations({ session }) {
 										<p>Nombre d'interventions: <b>{vac.intervention_count}</b></p>
                     {vac.notes && <p className="vacation-notes">Notes: {vac.notes}</p>}
                     
+                    {vac.activity_type === 'garde' && vac.overlapping_users && vac.overlapping_users.length > 0 && (
+                      <div className="overlapping-users">
+                        <p>Autres sapeurs en garde sur cette période :</p>
+                        <div className="avatar-bubbles">
+                          {vac.overlapping_users.map(user => (
+                            <div key={user.id} className="avatar-bubble" title={`${user.prenom} ${user.nom}`}>
+                              {user.photo_url ? (
+                                <img src={user.photo_url} alt={`${user.prenom} ${user.nom}`} />
+                              ) : (
+                                <div className="avatar-placeholder">
+                                  {user.prenom ? user.prenom.charAt(0).toUpperCase() : ''}
+                                  {user.nom ? user.nom.charAt(0).toUpperCase() : ''}
+                                </div>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
                   </div>
                   <div className="vacation-actions">
                     <button onClick={() => handleEdit(vac)} className="edit-button">Modifier</button>
