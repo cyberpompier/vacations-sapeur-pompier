@@ -1,3 +1,16 @@
+:root {
+  --primary-color: #007bff; /* Bleu */
+  --primary-color-rgb: 0, 123, 255;
+  --primary-color-dark: #0056b3; /* Bleu plus foncé pour le survol */
+  --secondary-color: #6c757d; /* Gris pour le bouton d'inscription */
+  --secondary-color-dark: #5a6268;
+  --background-color-light: #f8f9fa;
+  --text-color: #343a40;
+  --border-color: #ced4da;
+  --input-background-color: #ffffff;
+  --button-disabled-color: #a0a0a0;
+}
+
 .auth-form-container {
   display: flex;
   flex-direction: column;
