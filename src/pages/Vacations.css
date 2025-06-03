@@ -119,7 +119,7 @@
 
 /* Styles pour le nouveau filtre par mois */
 .filter-section {
-  margin-bottom: 30px;
+  margin-top: 20px; /* Add some space from the summary content */
   padding: 15px 25px;
   background-color: #f0f8ff;
   border: 1px solid #cce5ff;
@@ -195,6 +195,20 @@
   padding-top: 10px;
   margin-top: 10px;
 }
+
+.intervention-info {
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px dashed #eee;
+  font-size: 0.95em;
+  color: #007bff;
+}
+
+.intervention-info strong {
+  font-size: 1em; /* Reset font size for strong within this paragraph */
+  color: #007bff;
+}
+
 
 .vacation-actions {
   display: flex;

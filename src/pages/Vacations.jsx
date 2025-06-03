@@ -612,23 +612,22 @@ function Vacations({ session }) {
                 </li>
               ))}
             </ul>
-          </div>
-
-          {/* Nouveau sélecteur de filtre par mois */}
-          <div className="filter-section">
-            <label htmlFor="month-filter">Filtrer par mois:</label>
-            <select
-              id="month-filter"
-              value={selectedMonth}
-              onChange={handleMonthFilterChange}
-            >
-              <option value="all">Tous les mois</option>
-              {availableMonths.map(month => (
-                <option key={month} value={month}>
-                  {format(parseISO(month + '-01'), 'MMMM yyyy', { locale: fr })}
-                </option>
-              ))}
-            </select>
+            {/* Nouveau sélecteur de filtre par mois déplacé ici */}
+            <div className="filter-section">
+              <label htmlFor="month-filter">Filtrer par mois:</label>
+              <select
+                id="month-filter"
+                value={selectedMonth}
+                onChange={handleMonthFilterChange}
+              >
+                <option value="all">Tous les mois</option>
+                {availableMonths.map(month => (
+                  <option key={month} value={month}>
+                    {format(parseISO(month + '-01'), 'MMMM yyyy', { locale: fr })}
+                  </option>
+                ))}
+              </select>
+            </div>
           </div>
 
           <h3>Liste des Vacations</h3>
@@ -645,12 +644,9 @@ function Vacations({ session }) {
                     <p>Durée: {(vac.duration_minutes / 60).toFixed(2)}h</p>
                     <p>Taux appliqué: {vac.hourly_rate_applied.toFixed(2)} €/h</p>
                     <p>Montant: {vac.total_amount.toFixed(2)} €</p>
+										<p>Nombre d'interventions: <b>{vac.intervention_count}</b></p>
                     {vac.notes && <p className="vacation-notes">Notes: {vac.notes}</p>}
-                    {vac.activity_type === 'garde' && vac.intervention_count > 0 && (
-                      <p className="intervention-info">
-                        Nombre d'interventions sur cette période: <strong>{vac.intervention_count}</strong>
-                      </p>
-                    )}
+                    
                   </div>
                   <div className="vacation-actions">
                     <button onClick={() => handleEdit(vac)} className="edit-button">Modifier</button>
