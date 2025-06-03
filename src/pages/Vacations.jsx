@@ -82,6 +82,36 @@ const calculateGardeSegment = (segmentStart, segmentEnd, dailySlots, getActualHo
   return { duration: segmentDurationMinutes, amount: segmentAmount };
 };
 
+// Helper function to calculate duration and amount for a single intervention
+const calculateInterventionDetails = (start, end, hourlyRates) => {
+  // Ensure start and end are valid non-empty strings before parsing
+  if (typeof start !== 'string' || start.trim() === '' || typeof end !== 'string' || end.trim() === '') {
+    return { duration_minutes: 0, total_amount: 0, hourly_rate_applied: 0 };
+  }
+
+  const startDate = parseISO(start);
+  const endDate = parseISO(end);
+
+  if (isNaN(startDate.getTime()) || isNaN(endDate.getTime()) || endDate <= startDate) {
+    return { duration_minutes: 0, total_amount: 0, hourly_rate_applied: 0 };
+  }
+
+  const durationMinutes = differenceInMinutes(endDate, startDate);
+  const hours = durationMinutes / 60;
+
+  const baseRate = hourlyRates.baseRate || 0;
+  const percentage = hourlyRates.intervention || 0; // Use 'intervention' rate
+  const actualHourlyRate = baseRate * (percentage / 100);
+
+  const totalAmount = hours * actualHourlyRate;
+
+  return {
+    duration_minutes: Math.round(durationMinutes),
+    total_amount: parseFloat(totalAmount.toFixed(2)),
+    hourly_rate_applied: parseFloat(actualHourlyRate.toFixed(2)),
+  };
+};
+
 
 function Vacations({ session }) {
   // vacations: Liste des vacations actuellement affichées (filtrées)
@@ -145,8 +175,13 @@ function Vacations({ session }) {
       // 1. Générer les mois uniques pour le sélecteur de filtre
       const months = new Set();
       allVacations.forEach(vac => {
-        const date = parseISO(vac.start_time);
-        months.add(format(date, 'yyyy-MM'));
+        // Ensure vac.start_time is not null/undefined or empty string before parsing
+        if (typeof vac.start_time === 'string' && vac.start_time.trim() !== '') {
+          const date = parseISO(vac.start_time);
+          if (!isNaN(date.getTime())) { // Ensure parsed date is valid
+            months.add(format(date, 'yyyy-MM'));
+          }
+        }
       });
       // Trier les mois du plus ancien au plus récent
       const sortedMonths = Array.from(months).sort((a, b) => new Date(a) - new Date(b));
@@ -157,7 +192,14 @@ function Vacations({ session }) {
         if (selectedMonth === 'all') {
           return true; // Afficher toutes les vacations si 'all' est sélectionné
         }
+        // Ensure vac.start_time is not null/undefined or empty string before parsing
+        if (typeof vac.start_time !== 'string' || vac.start_time.trim() === '') {
+          return false;
+        }
         const vacDate = parseISO(vac.start_time);
+        if (isNaN(vacDate.getTime())) { // Ensure parsed date is valid
+          return false;
+        }
         const [year, month] = selectedMonth.split('-').map(Number);
         // Comparer l'année et le mois de la vacation avec le mois sélectionné
         return vacDate.getFullYear() === year && (vacDate.getMonth() + 1) === month;
@@ -286,6 +328,11 @@ function Vacations({ session }) {
   };
 
   const calculateDurationAndAmount = (start, end, type, interventionsData) => {
+    // Ensure start and end are valid non-empty strings before parsing
+    if (typeof start !== 'string' || start.trim() === '' || typeof end !== 'string' || end.trim() === '') {
+      return { duration_minutes: 0, total_amount: 0, hourly_rate_applied: 0, intervention_count: 0 };
+    }
+
     const startDate = parseISO(start);
     const endDate = parseISO(end);
 
@@ -294,6 +341,9 @@ function Vacations({ session }) {
     }
 
     const baseRate = hourlyRates.baseRate || 0;
+
+    // Declare intervention_count here so it's accessible in both branches
+    let intervention_count = 0; 
 
     // Helper pour obtenir le taux horaire réel pour un type d'activité donné (garde ou astreinte)
     const getActualHourlyRate = (activityType) => {
@@ -304,8 +354,7 @@ function Vacations({ session }) {
     if (type === 'garde') {
       const fullGardeDurationMinutes = differenceInMinutes(endDate, startDate); // Durée totale de la garde
       let totalAmount = 0;
-      let intervention_count = 0; 
-
+      
       // Définir les tranches horaires journalières et leurs types de taux correspondants
       const dailySlots = [
         { start: { h: 0, m: 0 }, end: { h: 8, m: 0 }, rateType: 'astreinte' },
@@ -317,9 +366,18 @@ function Vacations({ session }) {
 
       // 1. Identifier les interventions pertinentes qui chevauchent la période de garde
       const relevantInterventions = interventionsData.filter(int => {
+        // Ensure both start_time and end_time are valid non-empty strings before parsing
+        if (typeof int.start_time !== 'string' || int.start_time.trim() === '' ||
+            typeof int.end_time !== 'string' || int.end_time.trim() === '') {
+          return false; // Skip this intervention if times are missing or empty
+        }
         const intStart = parseISO(int.start_time);
         const intEnd = parseISO(int.end_time);
-        return int.end_time && isBefore(intStart, endDate) && isAfter(intEnd, startDate);
+        // Also ensure parsed dates are valid Date objects
+        if (isNaN(intStart.getTime()) || isNaN(intEnd.getTime())) {
+          return false; // Skip if parsed dates are invalid
+        }
+        return isBefore(intStart, endDate) && isAfter(intEnd, startDate);
       });
 
       intervention_count = relevantInterventions.length; 
@@ -379,7 +437,7 @@ function Vacations({ session }) {
         duration_minutes: Math.round(durationMinutes),
         total_amount: parseFloat(totalAmount.toFixed(2)),
         hourly_rate_applied: parseFloat(actualHourlyRate.toFixed(2)),
-        intervention_count: 0, 
+        intervention_count: intervention_count, // Use the declared variable
       };
     }
   };
@@ -512,18 +570,62 @@ function Vacations({ session }) {
     };
 
     activityTypes.forEach(type => {
-      summary.byActivity[type] = { hours: 0, amount: 0 };
+      summary.byActivity[type] = { hours: 0, amount: 0, count: 0 };
     });
 
+    // Calculate for 'garde' and 'astreinte' from vacations
     vacations.forEach(vac => {
-      const hours = vac.duration_minutes / 60;
-      summary.totalHours += hours;
-      summary.totalAmount += vac.total_amount;
-      if (summary.byActivity[vac.activity_type]) {
+      if (vac.activity_type === 'garde' || vac.activity_type === 'astreinte') {
+        const hours = vac.duration_minutes / 60;
         summary.byActivity[vac.activity_type].hours += hours;
         summary.byActivity[vac.activity_type].amount += vac.total_amount;
       }
     });
+
+    // Calculate for 'intervention' from allInterventions (completed ones)
+    let interventionTotalHours = 0;
+    let interventionTotalAmount = 0;
+    let interventionCount = 0;
+
+    // Filter interventions by selected month
+    const filteredInterventions = allInterventions.filter(int => {
+      if (selectedMonth === 'all') {
+        return true;
+      }
+      // Ensure int.start_time is not null/undefined or empty string before parsing
+      if (typeof int.start_time !== 'string' || int.start_time.trim() === '') {
+        return false;
+      }
+      const intDate = parseISO(int.start_time);
+      if (isNaN(intDate.getTime())) { // Ensure parsed date is valid
+        return false;
+      }
+      const [year, month] = selectedMonth.split('-').map(Number);
+      return intDate.getFullYear() === year && (intDate.getMonth() + 1) === month;
+    });
+
+    filteredInterventions.forEach(int => {
+      // Ensure both start_time and end_time exist and are valid strings before calling calculateInterventionDetails
+      if (typeof int.start_time === 'string' && int.start_time.trim() !== '' && 
+          typeof int.end_time === 'string' && int.end_time.trim() !== '') { 
+        const { duration_minutes, total_amount } = calculateInterventionDetails(
+          int.start_time,
+          int.end_time,
+          hourlyRates
+        );
+        interventionTotalHours += duration_minutes / 60;
+        interventionTotalAmount += total_amount;
+        interventionCount++;
+      }
+    });
+
+    summary.byActivity.intervention.hours = interventionTotalHours;
+    summary.byActivity.intervention.amount = interventionTotalAmount;
+    summary.byActivity.intervention.count = interventionCount;
+
+    // Calculate overall totals by summing up the individual activity totals
+    summary.totalHours = summary.byActivity.garde.hours + summary.byActivity.astreinte.hours + summary.byActivity.intervention.hours;
+    summary.totalAmount = summary.byActivity.garde.amount + summary.byActivity.astreinte.amount + summary.byActivity.intervention.amount;
 
     return summary;
   };
@@ -609,6 +711,7 @@ function Vacations({ session }) {
               {activityTypes.map(type => (
                 <li key={type}>
                   {type.charAt(0).toUpperCase() + type.slice(1)}: {summary.byActivity[type].hours.toFixed(2)}h / {summary.byActivity[type].amount.toFixed(2)} €
+                  {type === 'intervention' && ` (${summary.byActivity[type].count} interventions)`}
                 </li>
               ))}
             </ul>
@@ -643,7 +746,7 @@ function Vacations({ session }) {
                     <p>Fin: {format(parseISO(vac.end_time), 'dd/MM/yyyy HH:mm', { locale: fr })}</p>
                     <p>Durée: {(vac.duration_minutes / 60).toFixed(2)}h</p>
                     <p>Taux appliqué: {vac.hourly_rate_applied.toFixed(2)} €/h</p>
-                    <p>Montant: {vac.total_amount.toFixed(2)} €</p>
+										<p>Montant: {vac.total_amount.toFixed(2)} €</p>
 										<p>Nombre d'interventions: <b>{vac.intervention_count}</b></p>
                     {vac.notes && <p className="vacation-notes">Notes: {vac.notes}</p>}
                     

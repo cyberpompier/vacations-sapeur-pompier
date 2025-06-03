@@ -14,7 +14,7 @@ function MaGarde({ session }) {
   // State for editing
   const [editingInterventionId, setEditingInterventionId] = useState(null);
   const [editStartTime, setEditStartTime] = useState('');
-  const [editEndTime, setEditEndTime] = useState('');
+  const [editEndTime, setEditEndTime] = useState(''); // Corrected: Should be useState('')
 
   useEffect(() => {
     if (session) {
@@ -131,7 +131,7 @@ function MaGarde({ session }) {
       setInterventionStartTime(null);
       alert('Retour d\'intervention enregistré !');
       fetchInterventionHistory(); // Refresh history after completing an intervention
-    } catch (err) {
+    } catch (err) { // Corrected: Removed '=>'
       console.error('Error ending intervention:', err.message);
       setError('Erreur lors de l\'enregistrement du retour d\'intervention.');
     } finally {
@@ -283,7 +283,7 @@ function MaGarde({ session }) {
           </div>
 
           <div className="intervention-history">
-            <h3>Historique des interventions</h3>
+            <h3>Historique des interventions ({interventionsHistory.length} interventions)</h3>
             {interventionsHistory.length > 0 ? (
               <ul className="history-list">
                 {interventionsHistory.map((intervention) => (
