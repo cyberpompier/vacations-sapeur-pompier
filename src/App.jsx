@@ -3,7 +3,8 @@ import Header from './components/Header';
 import Footer from './components/Footer';
 import Vacations from './pages/Vacations';
 import Settings from './pages/Settings';
-import AuthForm from './components/AuthForm'; // Import AuthForm
+import UserProfile from './pages/UserProfile'; // Import UserProfile
+import AuthForm from './components/AuthForm';
 import { supabase } from './supabaseClient';
 import './index.css';
 
@@ -32,7 +33,7 @@ function App() {
     setLoading(true);
     const { error } = await supabase.auth.signInWithPassword({ email, password });
     if (error) {
-      alert(error.message); // Keep alert for now, can be replaced with better UI feedback
+      alert(error.message);
     }
     setLoading(false);
   };
@@ -41,7 +42,7 @@ function App() {
     setLoading(true);
     const { error } = await supabase.auth.signUp({ email, password });
     if (error) {
-      alert(error.message); // Keep alert for now
+      alert(error.message);
     } else {
       alert('Inscription réussie ! Veuillez vous connecter.');
     }
@@ -71,6 +72,7 @@ function App() {
           <>
             {currentPage === 'vacations' && <Vacations session={session} />}
             {currentPage === 'settings' && <Settings session={session} />}
+            {currentPage === 'userProfile' && <UserProfile session={session} />} {/* Render UserProfile */}
           </>
         )}
       </main>
