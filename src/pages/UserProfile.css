@@ -109,7 +109,7 @@
   cursor: pointer;
   transition: background-color 0.3s ease;
   width: auto; /* Allow button to size based on content */
-  align-self: flex-end; /* Align to the right within its group */
+  align-self: flex; /* Align to the right within its group */
 }
 
 .upload-button:hover:not(:disabled) {

@@ -313,7 +313,7 @@ function Vacations({ session }) {
 
   return (
     <div className="vacations-container">
-      <h2>Gestion des Vacations</h2>
+      
 
       {error && <p className="error-message">{error}</p>}
 
