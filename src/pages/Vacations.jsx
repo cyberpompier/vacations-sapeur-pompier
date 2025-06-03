@@ -1,15 +1,95 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { supabase } from '../supabaseClient';
-import { parseISO, format, differenceInMinutes, startOfMonth, endOfMonth, startOfDay, endOfDay, setHours, setMinutes, addDays, isBefore, min, max } from 'date-fns';
+import { parseISO, format, differenceInMinutes, startOfMonth, endOfMonth, startOfDay, endOfDay, setHours, setMinutes, addDays, isBefore, min, max, isAfter } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import PropTypes from 'prop-types';
 import './Vacations.css';
+
+// Helper function to subtract an exclusion interval from a list of periods
+// periods: [{ start: Date, end: Date }]
+// exclusionStart: Date, exclusionEnd: Date
+const subtractIntervals = (periods, exclusionStart, exclusionEnd) => {
+  const newPeriods = [];
+  periods.forEach(period => {
+    // Case 1: No overlap (period is entirely before or entirely after exclusion)
+    // If the period ends before the exclusion starts, OR the period starts after the exclusion ends,
+    // then there is no overlap, and the period is kept as is.
+    if (isBefore(period.end, exclusionStart) || isAfter(period.start, exclusionEnd)) {
+      newPeriods.push(period);
+      return;
+    }
+
+    // Case 2: Exclusion completely covers the period
+    // If the exclusion starts before or at the period start, AND ends after or at the period end,
+    // then the period is completely removed.
+    if (isBefore(exclusionStart, period.start) && isAfter(exclusionEnd, period.end)) {
+      return; // Period is completely removed
+    }
+
+    // Case 3: Partial overlap, need to split the period
+    // Part before the exclusion
+    if (isBefore(period.start, exclusionStart)) {
+      const newEnd = min([period.end, exclusionStart]);
+      if (isBefore(period.start, newEnd)) { // Ensure valid interval
+        newPeriods.push({ start: period.start, end: newEnd });
+      }
+    }
+
+    // Part after the exclusion
+    if (isAfter(period.end, exclusionEnd)) {
+      const newStart = max([period.start, exclusionEnd]);
+      if (isBefore(newStart, period.end)) { // Ensure valid interval
+        newPeriods.push({ start: newStart, end: period.end });
+      }
+    }
+  });
+  return newPeriods;
+};
+
+// Helper function to calculate duration and amount for a single garde segment
+const calculateGardeSegment = (segmentStart, segmentEnd, dailySlots, getActualHourlyRate) => {
+  let segmentDurationMinutes = 0;
+  let segmentAmount = 0;
+
+  let currentProcessingTime = segmentStart;
+
+  while (isBefore(currentProcessingTime, segmentEnd)) {
+    const endOfCurrentDay = endOfDay(currentProcessingTime);
+    const dailySegmentEnd = min([segmentEnd, endOfCurrentDay]);
+
+    for (const slot of dailySlots) {
+      let slotStartOnDay = setMinutes(setHours(startOfDay(currentProcessingTime), slot.start.h), slot.start.m);
+      let slotEndOnDay = setMinutes(setHours(startOfDay(currentProcessingTime), slot.end.h), slot.end.m);
+
+      if (slot.end.h === 24) {
+        slotEndOnDay = addDays(startOfDay(currentProcessingTime), 1);
+      }
+
+      const intersectionStart = max([currentProcessingTime, slotStartOnDay]);
+      const intersectionEnd = min([dailySegmentEnd, slotEndOnDay]);
+
+      if (isBefore(intersectionStart, intersectionEnd)) {
+        const duration = differenceInMinutes(intersectionEnd, intersectionStart);
+        if (duration > 0) {
+          const rate = getActualHourlyRate(slot.rateType);
+          segmentAmount += (duration / 60) * rate;
+          segmentDurationMinutes += duration;
+        }
+      }
+    }
+    currentProcessingTime = addDays(startOfDay(currentProcessingTime), 1);
+  }
+  return { duration: segmentDurationMinutes, amount: segmentAmount };
+};
+
 
 function Vacations({ session }) {
   // vacations: Liste des vacations actuellement affichées (filtrées)
   const [vacations, setVacations] = useState([]);
   // allVacations: Liste complète de toutes les vacations récupérées de la base de données
   const [allVacations, setAllVacations] = useState([]);
+  // allInterventions: Liste complète de toutes les interventions terminées de la base de données
+  const [allInterventions, setAllInterventions] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [form, setForm] = useState({
@@ -34,13 +114,30 @@ function Vacations({ session }) {
   // Effet pour récupérer toutes les vacations et les taux horaires au chargement du composant
   useEffect(() => {
     if (session?.user?.id) {
-      fetchAllVacations();
-      fetchUserHourlyRates(); // Appel de la nouvelle fonction pour les taux
+      const fetchData = async () => {
+        setLoading(true);
+        setError(null);
+        await fetchUserHourlyRates(); // Rates needed for calculation
+        await fetchAllInterventions(); // Interventions needed for calculation
+        // fetchAllVacations will be called after interventions are fetched
+        // to ensure correct recalculation of garde durations
+        setLoading(false);
+      };
+      fetchData();
     } else {
       setLoading(false);
       setError('Veuillez vous connecter pour gérer les vacations.');
     }
   }, [session]);
+
+  // Effet pour re-fetch les vacations une fois que allInterventions est mis à jour
+  // Ceci est crucial pour que les vacations de type 'garde' soient recalculées avec les dernières interventions
+  useEffect(() => {
+    if (session?.user?.id && allInterventions.length > 0 || (session?.user?.id && allInterventions.length === 0 && !loading)) {
+      // Only fetch vacations if interventions are loaded or confirmed empty
+      fetchAllVacations();
+    }
+  }, [allInterventions, session]); // Depend on allInterventions and session
 
   // Effet pour filtrer les vacations et générer les mois disponibles lorsque allVacations ou selectedMonth changent
   useEffect(() => {
@@ -74,8 +171,7 @@ function Vacations({ session }) {
 
   // Fonction pour récupérer toutes les vacations de l'utilisateur
   const fetchAllVacations = async () => {
-    setLoading(true);
-    setError(null);
+    // setLoading(true) and setError(null) are handled by the useEffect wrapper
     const { data, error } = await supabase
       .from('vacations')
       .select('*')
@@ -87,9 +183,48 @@ function Vacations({ session }) {
       setError('Impossible de charger les vacations.');
       setAllVacations([]);
     } else {
-      setAllVacations(data); // Stocker toutes les vacations
+      // Re-calculate duration and amount for 'garde' vacations based on current interventions
+      const processedVacations = data.map(vac => {
+        if (vac.activity_type === 'garde') {
+          // Ensure allInterventions is available here.
+          // This is why fetchAllInterventions must complete before this.
+          const { duration_minutes, total_amount, hourly_rate_applied, intervention_count } = calculateDurationAndAmount(
+            vac.start_time,
+            vac.end_time,
+            vac.activity_type,
+            allInterventions // Pass the state here
+          );
+          return {
+            ...vac,
+            duration_minutes,
+            total_amount,
+            hourly_rate_applied,
+            intervention_count, // Add the new count
+          };
+        }
+        return vac;
+      });
+      setAllVacations(processedVacations); // Stocker toutes les vacations (potentiellement recalculées)
     }
-    setLoading(false);
+  };
+
+  // Nouvelle fonction pour récupérer toutes les interventions terminées de l'utilisateur
+  const fetchAllInterventions = async () => {
+    if (!session?.user?.id) return;
+
+    const { data, error } = await supabase
+      .from('interventions')
+      .select('id, start_time, end_time')
+      .eq('user_id', session.user.id)
+      .eq('is_active', false); // Only completed interventions affect garde calculations
+
+    if (error) {
+      console.error('Erreur lors du chargement des interventions:', error);
+      setError('Impossible de charger les interventions pour le calcul des gardes.');
+      setAllInterventions([]);
+    } else {
+      setAllInterventions(data || []);
+    }
   };
 
   // Nouvelle fonction pour récupérer les taux horaires spécifiques au grade de l'utilisateur
@@ -150,12 +285,12 @@ function Vacations({ session }) {
     setSelectedMonth(e.target.value);
   };
 
-  const calculateDurationAndAmount = (start, end, type) => {
+  const calculateDurationAndAmount = (start, end, type, interventionsData) => {
     const startDate = parseISO(start);
     const endDate = parseISO(end);
 
     if (isNaN(startDate.getTime()) || isNaN(endDate.getTime()) || endDate <= startDate) {
-      return { duration_minutes: 0, total_amount: 0, hourly_rate_applied: 0 };
+      return { duration_minutes: 0, total_amount: 0, hourly_rate_applied: 0, intervention_count: 0 };
     }
 
     const baseRate = hourlyRates.baseRate || 0;
@@ -167,67 +302,71 @@ function Vacations({ session }) {
     };
 
     if (type === 'garde') {
-      let totalGardeAmount = 0;
-      let totalGardeDurationMinutes = 0;
+      const fullGardeDurationMinutes = differenceInMinutes(endDate, startDate); // Durée totale de la garde
+      let totalAmount = 0;
+      let intervention_count = 0; 
 
       // Définir les tranches horaires journalières et leurs types de taux correspondants
-      // Ces tranches sont relatives au début d'une journée donnée (00:00)
       const dailySlots = [
         { start: { h: 0, m: 0 }, end: { h: 8, m: 0 }, rateType: 'astreinte' },
         { start: { h: 8, m: 0 }, end: { h: 12, m: 0 }, rateType: 'garde' },
         { start: { h: 12, m: 0 }, end: { h: 13, m: 30 }, rateType: 'astreinte' },
         { start: { h: 13, m: 30 }, end: { h: 17, m: 30 }, rateType: 'garde' },
-        { start: { h: 17, m: 30 }, end: { h: 24, m: 0 }, rateType: 'astreinte' }, // 24:00 est la fin de la journée
+        { start: { h: 17, m: 30 }, end: { h: 24, m: 0 }, rateType: 'astreinte' },
       ];
 
-      let currentProcessingTime = startDate;
+      // 1. Identifier les interventions pertinentes qui chevauchent la période de garde
+      const relevantInterventions = interventionsData.filter(int => {
+        const intStart = parseISO(int.start_time);
+        const intEnd = parseISO(int.end_time);
+        return int.end_time && isBefore(intStart, endDate) && isAfter(intEnd, startDate);
+      });
 
-      // Boucle tant que le temps de traitement actuel est avant la date de fin de la vacation
-      while (isBefore(currentProcessingTime, endDate)) {
-        // Déterminer la fin de la journée actuelle ou la fin de la vacation, selon ce qui arrive en premier
-        const endOfCurrentDay = endOfDay(currentProcessingTime);
-        const segmentEnd = min([endDate, endOfCurrentDay]);
+      intervention_count = relevantInterventions.length; 
 
-        // Itérer à travers les tranches horaires journalières
-        for (const slot of dailySlots) {
-          // Calculer les heures de début et de fin réelles pour cette tranche sur la journée actuelle
-          let slotStartOnDay = setMinutes(setHours(startOfDay(currentProcessingTime), slot.start.h), slot.start.m);
-          let slotEndOnDay = setMinutes(setHours(startOfDay(currentProcessingTime), slot.end.h), slot.end.m);
+      // 2. Calculer le montant pour les périodes de garde/astreinte NON couvertes par les interventions
+      let effectiveGardePeriods = [{ start: startDate, end: endDate }];
+      relevantInterventions.forEach(intervention => {
+        const iStart = parseISO(intervention.start_time);
+        const iEnd = parseISO(intervention.end_time);
+        effectiveGardePeriods = subtractIntervals(effectiveGardePeriods, iStart, iEnd);
+      });
 
-          // Gérer le cas 24:00 pour la fin de journée (qui est 00:00 du jour suivant)
-          if (slot.end.h === 24) {
-            slotEndOnDay = addDays(startOfDay(currentProcessingTime), 1);
-          }
+      effectiveGardePeriods.forEach(period => {
+        const { amount } = calculateGardeSegment(period.start, period.end, dailySlots, getActualHourlyRate);
+        totalAmount += amount; // Montant pour les parties de garde/astreinte non-intervention
+      });
 
-          // Calculer l'intersection de la période de la vacation et de la tranche horaire actuelle
-          const intersectionStart = max([currentProcessingTime, slotStartOnDay]);
-          const intersectionEnd = min([segmentEnd, slotEndOnDay]);
+      // 3. Calculer le montant pour les périodes d'intervention
+      const interventionRate = getActualHourlyRate('intervention');
+      relevantInterventions.forEach(intervention => {
+        const iStart = parseISO(intervention.start_time);
+        const iEnd = parseISO(intervention.end_time);
 
-          // Si l'intersection est valide (début avant la fin)
-          if (isBefore(intersectionStart, intersectionEnd)) {
-            const duration = differenceInMinutes(intersectionEnd, intersectionStart);
-            if (duration > 0) {
-              const rate = getActualHourlyRate(slot.rateType);
-              totalGardeAmount += (duration / 60) * rate;
-              totalGardeDurationMinutes += duration;
-            }
+        // Calculer le chevauchement réel de l'intervention avec la période de garde
+        const overlapStart = max([startDate, iStart]);
+        const overlapEnd = min([endDate, iEnd]);
+
+        if (isBefore(overlapStart, overlapEnd)) {
+          const duration = differenceInMinutes(overlapEnd, overlapStart);
+          if (duration > 0) {
+            totalAmount += (duration / 60) * interventionRate; // Ajouter le montant pour la partie intervention
           }
         }
-        // Passer au début du jour suivant pour la prochaine itération
-        currentProcessingTime = addDays(startOfDay(currentProcessingTime), 1);
-      }
+      });
 
       // Calculer le taux horaire moyen appliqué pour l'affichage
-      const averageHourlyRate = totalGardeDurationMinutes > 0 ? totalGardeAmount / (totalGardeDurationMinutes / 60) : 0;
+      const averageHourlyRate = fullGardeDurationMinutes > 0 ? totalAmount / (fullGardeDurationMinutes / 60) : 0;
 
       return {
-        duration_minutes: Math.round(totalGardeDurationMinutes),
-        total_amount: parseFloat(totalGardeAmount.toFixed(2)),
-        hourly_rate_applied: parseFloat(averageHourlyRate.toFixed(2))
+        duration_minutes: Math.round(fullGardeDurationMinutes), // Durée totale de la garde
+        total_amount: parseFloat(totalAmount.toFixed(2)), // Montant total incluant les interventions
+        hourly_rate_applied: parseFloat(averageHourlyRate.toFixed(2)),
+        intervention_count, 
       };
 
     } else {
-      // Logique existante pour les autres types d'activités
+      // Logique existante pour les autres types d'activités (astreinte, intervention)
       const durationMinutes = differenceInMinutes(endDate, startDate);
       const hours = durationMinutes / 60;
 
@@ -239,7 +378,8 @@ function Vacations({ session }) {
       return {
         duration_minutes: Math.round(durationMinutes),
         total_amount: parseFloat(totalAmount.toFixed(2)),
-        hourly_rate_applied: parseFloat(actualHourlyRate.toFixed(2))
+        hourly_rate_applied: parseFloat(actualHourlyRate.toFixed(2)),
+        intervention_count: 0, 
       };
     }
   };
@@ -268,10 +408,11 @@ function Vacations({ session }) {
 
     // Calculer la durée et le montant en utilisant les valeurs originales du formulaire (chaînes d'heure locale)
     // La fonction calculateDurationAndAmount interprète correctement 'YYYY-MM-DDTHH:mm' comme heure locale.
-    const { duration_minutes, total_amount, hourly_rate_applied } = calculateDurationAndAmount(
+    const { duration_minutes, total_amount, hourly_rate_applied, intervention_count } = calculateDurationAndAmount(
       form.start_time, // Passer la chaîne d'heure locale originale pour le calcul
       form.end_time,   // Passer la chaîne d'heure locale originale pour le calcul
-      form.activity_type
+      form.activity_type,
+      allInterventions // Pass allInterventions for calculation
     );
 
     // Préparer les données pour Supabase : convertir les objets Date locaux en chaînes ISO UTC
@@ -283,6 +424,7 @@ function Vacations({ session }) {
       hourly_rate_applied,
       total_amount,
       user_id: session.user.id,
+      intervention_count, // Inclure le nombre d'interventions
     };
 
     let response;
@@ -504,6 +646,11 @@ function Vacations({ session }) {
                     <p>Taux appliqué: {vac.hourly_rate_applied.toFixed(2)} €/h</p>
                     <p>Montant: {vac.total_amount.toFixed(2)} €</p>
                     {vac.notes && <p className="vacation-notes">Notes: {vac.notes}</p>}
+                    {vac.activity_type === 'garde' && vac.intervention_count > 0 && (
+                      <p className="intervention-info">
+                        Nombre d'interventions sur cette période: <strong>{vac.intervention_count}</strong>
+                      </p>
+                    )}
                   </div>
                   <div className="vacation-actions">
                     <button onClick={() => handleEdit(vac)} className="edit-button">Modifier</button>

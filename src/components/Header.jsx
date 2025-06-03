@@ -45,7 +45,7 @@ function Header({ setCurrentPage, session, onSignOut }) {
             </button>
             <div ref={menuRef} className={`dropdown-menu ${isMenuOpen ? 'open' : ''}`}>
               <button onClick={() => handleMenuItemClick('vacations')} className="dropdown-item">Vacations</button>
-              {/* Renamed "User Profile" to "Profile" */}
+              <button onClick={() => handleMenuItemClick('maGarde')} className="dropdown-item">Ma Garde</button> {/* New menu item */}
               <button onClick={() => handleMenuItemClick('userProfile')} className="dropdown-item">Profil</button>
               <button onClick={() => handleMenuItemClick('settings')} className="dropdown-item">Paramètres</button>
               <button onClick={onSignOut} className="dropdown-item sign-out-item">Déconnexion</button>

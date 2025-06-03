@@ -1,0 +1,203 @@
+.ma-garde-container {
+  padding: 20px;
+  max-width: 800px;
+  margin: 20px auto;
+  background-color: #ffffff;
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  text-align: center;
+}
+
+.ma-garde-container h2 {
+  color: #282c34;
+  margin-bottom: 15px;
+  font-size: 2em;
+}
+
+.ma-garde-container p {
+  color: #555;
+  line-height: 1.6;
+  margin-bottom: 10px;
+}
+
+.intervention-status {
+  margin-top: 30px;
+  padding: 20px;
+  border: 1px solid #e0e0e0;
+  border-radius: 8px;
+  background-color: #f9f9f9;
+}
+
+.status-active {
+  color: #d9534f; /* Red for active status */
+  font-weight: bold;
+}
+
+.status-inactive {
+  color: #5cb85c; /* Green for inactive status */
+  font-weight: bold;
+}
+
+.status-duration {
+  font-style: italic;
+  color: #777;
+  margin-top: 5px;
+}
+
+.intervention-buttons {
+  margin-top: 20px;
+  display: flex;
+  justify-content: center;
+  gap: 15px;
+}
+
+.button {
+  padding: 10px 20px;
+  border: none;
+  border-radius: 5px;
+  cursor: pointer;
+  font-size: 1em;
+  transition: background-color 0.3s ease, opacity 0.3s ease;
+}
+
+.depart-button {
+  background-color: #007bff; /* Blue */
+  color: white;
+}
+
+.depart-button:hover:not(:disabled) {
+  background-color: #0056b3;
+}
+
+.retour-button {
+  background-color: #28a745; /* Green */
+  color: white;
+}
+
+.retour-button:hover:not(:disabled) {
+  background-color: #218838;
+}
+
+.button:disabled {
+  background-color: #cccccc;
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.error-message {
+  color: #dc3545;
+  margin-top: 10px;
+}
+
+.intervention-history {
+  margin-top: 40px;
+  padding: 20px;
+  border: 1px solid #e0e0e0;
+  border-radius: 8px;
+  background-color: #f9f9f9;
+}
+
+.intervention-history h3 {
+  color: #282c34;
+  margin-bottom: 20px;
+  font-size: 1.5em;
+}
+
+.history-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.history-item {
+  background-color: #ffffff;
+  border: 1px solid #eee;
+  border-radius: 5px;
+  margin-bottom: 10px;
+  padding: 15px;
+  text-align: left;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.05);
+}
+
+.history-item p {
+  margin: 5px 0;
+  color: #333;
+}
+
+.history-item p strong {
+  color: #007bff;
+}
+
+/* Styles for edit form */
+.edit-form {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+.edit-form label {
+  display: flex;
+  flex-direction: column;
+  font-weight: bold;
+  color: #333;
+}
+
+.edit-form input[type="datetime-local"] {
+  padding: 8px;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  margin-top: 5px;
+  font-size: 1em;
+}
+
+.edit-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 10px;
+}
+
+.save-button {
+  background-color: #007bff;
+  color: white;
+}
+
+.save-button:hover {
+  background-color: #0056b3;
+}
+
+.cancel-button {
+  background-color: #6c757d;
+  color: white;
+}
+
+.cancel-button:hover {
+  background-color: #5a6268;
+}
+
+/* Styles for history actions (edit/delete buttons) */
+.history-actions {
+  margin-top: 15px;
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+.edit-button {
+  background-color: #ffc107; /* Yellow/Orange */
+  color: #333;
+}
+
+.edit-button:hover {
+  background-color: #e0a800;
+}
+
+.delete-button {
+  background-color: #dc3545; /* Red */
+  color: white;
+}
+
+.delete-button:hover {
+  background-color: #c82333;
+}

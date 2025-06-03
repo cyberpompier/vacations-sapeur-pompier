@@ -3,7 +3,8 @@ import Header from './components/Header';
 import Footer from './components/Footer';
 import Vacations from './pages/Vacations';
 import Settings from './pages/Settings';
-import UserProfile from './pages/UserProfile'; // Import UserProfile
+import UserProfile from './pages/UserProfile';
+import MaGarde from './pages/MaGarde'; // Import MaGarde
 import AuthForm from './components/AuthForm';
 import { supabase } from './supabaseClient';
 import './index.css';
@@ -71,8 +72,9 @@ function App() {
         ) : (
           <>
             {currentPage === 'vacations' && <Vacations session={session} />}
+            {currentPage === 'maGarde' && <MaGarde session={session} />} {/* Render MaGarde */}
             {currentPage === 'settings' && <Settings session={session} />}
-            {currentPage === 'userProfile' && <UserProfile session={session} />} {/* Render UserProfile */}
+            {currentPage === 'userProfile' && <UserProfile session={session} />}
           </>
         )}
       </main>
