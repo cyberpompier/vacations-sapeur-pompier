@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { supabase } from '../supabaseClient';
-import { parseISO, format, differenceInMinutes, startOfMonth, endOfMonth } from 'date-fns';
+import { parseISO, format, differenceInMinutes, startOfMonth, endOfMonth, startOfDay, endOfDay, setHours, setMinutes, addDays, isBefore, min, max } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import PropTypes from 'prop-types';
 import './Vacations.css';
@@ -158,21 +158,90 @@ function Vacations({ session }) {
       return { duration_minutes: 0, total_amount: 0, hourly_rate_applied: 0 };
     }
 
-    const durationMinutes = differenceInMinutes(endDate, startDate);
-    const hours = durationMinutes / 60;
-
-    // Calculer le taux horaire réel basé sur le taux de base et le pourcentage de l'activité
     const baseRate = hourlyRates.baseRate || 0;
-    const percentage = hourlyRates[type] || 0; // Récupérer le pourcentage pour le type d'activité
-    const actualHourlyRate = baseRate * (percentage / 100); // Calcul du taux réel
 
-    const totalAmount = hours * actualHourlyRate;
-
-    return {
-      duration_minutes: Math.round(durationMinutes),
-      total_amount: parseFloat(totalAmount.toFixed(2)),
-      hourly_rate_applied: parseFloat(actualHourlyRate.toFixed(2)) // Stocker le taux calculé
+    // Helper pour obtenir le taux horaire réel pour un type d'activité donné (garde ou astreinte)
+    const getActualHourlyRate = (activityType) => {
+      const percentage = hourlyRates[activityType] || 0;
+      return baseRate * (percentage / 100);
     };
+
+    if (type === 'garde') {
+      let totalGardeAmount = 0;
+      let totalGardeDurationMinutes = 0;
+
+      // Définir les tranches horaires journalières et leurs types de taux correspondants
+      // Ces tranches sont relatives au début d'une journée donnée (00:00)
+      const dailySlots = [
+        { start: { h: 0, m: 0 }, end: { h: 8, m: 0 }, rateType: 'astreinte' },
+        { start: { h: 8, m: 0 }, end: { h: 12, m: 0 }, rateType: 'garde' },
+        { start: { h: 12, m: 0 }, end: { h: 13, m: 30 }, rateType: 'astreinte' },
+        { start: { h: 13, m: 30 }, end: { h: 17, m: 30 }, rateType: 'garde' },
+        { start: { h: 17, m: 30 }, end: { h: 24, m: 0 }, rateType: 'astreinte' }, // 24:00 est la fin de la journée
+      ];
+
+      let currentProcessingTime = startDate;
+
+      // Boucle tant que le temps de traitement actuel est avant la date de fin de la vacation
+      while (isBefore(currentProcessingTime, endDate)) {
+        // Déterminer la fin de la journée actuelle ou la fin de la vacation, selon ce qui arrive en premier
+        const endOfCurrentDay = endOfDay(currentProcessingTime);
+        const segmentEnd = min([endDate, endOfCurrentDay]);
+
+        // Itérer à travers les tranches horaires journalières
+        for (const slot of dailySlots) {
+          // Calculer les heures de début et de fin réelles pour cette tranche sur la journée actuelle
+          let slotStartOnDay = setMinutes(setHours(startOfDay(currentProcessingTime), slot.start.h), slot.start.m);
+          let slotEndOnDay = setMinutes(setHours(startOfDay(currentProcessingTime), slot.end.h), slot.end.m);
+
+          // Gérer le cas 24:00 pour la fin de journée (qui est 00:00 du jour suivant)
+          if (slot.end.h === 24) {
+            slotEndOnDay = addDays(startOfDay(currentProcessingTime), 1);
+          }
+
+          // Calculer l'intersection de la période de la vacation et de la tranche horaire actuelle
+          const intersectionStart = max([currentProcessingTime, slotStartOnDay]);
+          const intersectionEnd = min([segmentEnd, slotEndOnDay]);
+
+          // Si l'intersection est valide (début avant la fin)
+          if (isBefore(intersectionStart, intersectionEnd)) {
+            const duration = differenceInMinutes(intersectionEnd, intersectionStart);
+            if (duration > 0) {
+              const rate = getActualHourlyRate(slot.rateType);
+              totalGardeAmount += (duration / 60) * rate;
+              totalGardeDurationMinutes += duration;
+            }
+          }
+        }
+        // Passer au début du jour suivant pour la prochaine itération
+        currentProcessingTime = addDays(startOfDay(currentProcessingTime), 1);
+      }
+
+      // Calculer le taux horaire moyen appliqué pour l'affichage
+      const averageHourlyRate = totalGardeDurationMinutes > 0 ? totalGardeAmount / (totalGardeDurationMinutes / 60) : 0;
+
+      return {
+        duration_minutes: Math.round(totalGardeDurationMinutes),
+        total_amount: parseFloat(totalGardeAmount.toFixed(2)),
+        hourly_rate_applied: parseFloat(averageHourlyRate.toFixed(2))
+      };
+
+    } else {
+      // Logique existante pour les autres types d'activités
+      const durationMinutes = differenceInMinutes(endDate, startDate);
+      const hours = durationMinutes / 60;
+
+      const percentage = hourlyRates[type] || 0;
+      const actualHourlyRate = baseRate * (percentage / 100);
+
+      const totalAmount = hours * actualHourlyRate;
+
+      return {
+        duration_minutes: Math.round(durationMinutes),
+        total_amount: parseFloat(totalAmount.toFixed(2)),
+        hourly_rate_applied: parseFloat(actualHourlyRate.toFixed(2))
+      };
+    }
   };
 
   const handleSubmit = async (e) => {
@@ -186,23 +255,32 @@ function Vacations({ session }) {
       return;
     }
 
-    // Récupérer le taux horaire appliqué directement depuis la fonction de calcul
-    const { duration_minutes, total_amount, hourly_rate_applied } = calculateDurationAndAmount(
-      form.start_time,
-      form.end_time,
-      form.activity_type
-    );
+    // Créer des objets Date à partir des chaînes datetime-local (qui sont en heure locale)
+    const startDateTimeLocal = new Date(form.start_time);
+    const endDateTimeLocal = new Date(form.end_time);
 
-    if (duration_minutes <= 0) {
-      setError('L\'heure de fin doit être postérieure à l\'heure de début.');
+    // Valider les dates
+    if (isNaN(startDateTimeLocal.getTime()) || isNaN(endDateTimeLocal.getTime()) || endDateTimeLocal <= startDateTimeLocal) {
+      setError('L\'heure de fin doit être postérieure à l\'heure de début et les dates doivent être valides.');
       setLoading(false);
       return;
     }
 
+    // Calculer la durée et le montant en utilisant les valeurs originales du formulaire (chaînes d'heure locale)
+    // La fonction calculateDurationAndAmount interprète correctement 'YYYY-MM-DDTHH:mm' comme heure locale.
+    const { duration_minutes, total_amount, hourly_rate_applied } = calculateDurationAndAmount(
+      form.start_time, // Passer la chaîne d'heure locale originale pour le calcul
+      form.end_time,   // Passer la chaîne d'heure locale originale pour le calcul
+      form.activity_type
+    );
+
+    // Préparer les données pour Supabase : convertir les objets Date locaux en chaînes ISO UTC
     const vacationData = {
       ...form,
+      start_time: startDateTimeLocal.toISOString(), // Convertir en chaîne ISO UTC pour la base de données
+      end_time: endDateTimeLocal.toISOString(),     // Convertir en chaîne ISO UTC pour la base de données
       duration_minutes,
-      hourly_rate_applied, // Utiliser le taux calculé
+      hourly_rate_applied,
       total_amount,
       user_id: session.user.id,
     };
@@ -240,6 +318,9 @@ function Vacations({ session }) {
 
   const handleEdit = (vacation) => {
     setEditingVacationId(vacation.id);
+    // Lors de l'édition, vacation.start_time et vacation.end_time sont des chaînes ISO UTC de la DB.
+    // parseISO les convertit en objets Date UTC, et format les affiche dans le fuseau horaire local
+    // pour correspondre au format attendu par l'input datetime-local.
     setForm({
       activity_type: vacation.activity_type,
       start_time: format(parseISO(vacation.start_time), "yyyy-MM-dd'T'HH:mm"),
