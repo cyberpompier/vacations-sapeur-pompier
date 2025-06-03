@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import PropTypes from 'prop-types';
 import { supabase } from '../supabaseClient';
 import './UserProfile.css';
@@ -8,10 +8,11 @@ function UserProfile({ session }) {
   const [nom, setNom] = useState('');
   const [prenom, setPrenom] = useState('');
   const [caserneAffectation, setCaserneAffectation] = useState('');
-  const [grade, setGrade] = useState(''); // This will now hold the selected grade
+  const [grade, setGrade] = useState('');
   const [photoUrl, setPhotoUrl] = useState('');
+  const [uploading, setUploading] = useState(false);
+  const [avatarFile, setAvatarFile] = useState(null); // State to hold the selected file
 
-  // Define the list of available grades
   const gradesOptions = [
     'Sapeur',
     'Caporal',
@@ -47,7 +48,6 @@ function UserProfile({ session }) {
         setNom(data.nom);
         setPrenom(data.prenom);
         setCaserneAffectation(data.caserne_affectation);
-        // Set the grade, ensuring it's one of the valid options or default to empty
         setGrade(gradesOptions.includes(data.grade) ? data.grade : '');
         setPhotoUrl(data.photo_url);
       }
@@ -57,6 +57,58 @@ function UserProfile({ session }) {
       setLoading(false);
     }
   }
+
+  const uploadAvatar = useCallback(async (event) => {
+    if (!avatarFile) {
+      alert('Veuillez sélectionner un fichier à télécharger.');
+      return;
+    }
+
+    try {
+      setUploading(true);
+      const { user } = session;
+      const file = avatarFile;
+      const fileExt = file.name.split('.').pop();
+      const fileName = `${user.id}/${Date.now()}.${fileExt}`; // Unique path for each user's avatar
+
+      let { error: uploadError } = await supabase.storage
+        .from('avatars')
+        .upload(fileName, file, {
+          cacheControl: '3600',
+          upsert: true, // Overwrite if file with same name exists
+        });
+
+      if (uploadError) {
+        throw uploadError;
+      }
+
+      const { data: publicUrlData } = supabase.storage
+        .from('avatars')
+        .getPublicUrl(fileName);
+
+      if (publicUrlData && publicUrlData.publicUrl) {
+        setPhotoUrl(publicUrlData.publicUrl);
+        // Also update the profile in the database immediately after upload
+        const updates = {
+          id: user.id,
+          photo_url: publicUrlData.publicUrl,
+          updated_at: new Date().toISOString(),
+        };
+        let { error: updateError } = await supabase.from('profiles').upsert(updates);
+        if (updateError) {
+          throw updateError;
+        }
+        alert('Photo de profil téléchargée et mise à jour !');
+      } else {
+        throw new Error('Impossible d\'obtenir l\'URL publique de la photo.');
+      }
+    } catch (error) {
+      alert('Erreur lors du téléchargement de la photo : ' + error.message);
+    } finally {
+      setUploading(false);
+      setAvatarFile(null); // Clear the selected file after upload attempt
+    }
+  }, [session, avatarFile]);
 
   async function updateProfile(event) {
     event.preventDefault();
@@ -70,8 +122,8 @@ function UserProfile({ session }) {
         nom,
         prenom,
         caserne_affectation: caserneAffectation,
-        grade, // Use the selected grade from the dropdown
-        photo_url: photoUrl,
+        grade,
+        photo_url: photoUrl, // Use the photoUrl which might have been updated by uploadAvatar
         updated_at: new Date().toISOString(),
       };
 
@@ -126,11 +178,11 @@ function UserProfile({ session }) {
           <label htmlFor="grade">Grade:</label>
           <select
             id="grade"
-            value={grade || ''} // Ensure value is controlled
+            value={grade || ''}
             onChange={(e) => setGrade(e.target.value)}
             disabled={loading}
           >
-            <option value="">Sélectionnez un grade</option> {/* Default empty option */}
+            <option value="">Sélectionnez un grade</option>
             {gradesOptions.map((optionGrade) => (
               <option key={optionGrade} value={optionGrade}>
                 {optionGrade}
@@ -138,17 +190,33 @@ function UserProfile({ session }) {
             ))}
           </select>
         </div>
-        <div className="form-group">
-          <label htmlFor="photo_url">URL Photo:</label>
+        <div className="form-group photo-upload-group">
+          <label htmlFor="avatar">Photo de profil:</label>
+          {photoUrl && (
+            <div className="avatar-preview">
+              <img src={photoUrl} alt="Avatar" className="avatar-image" />
+            </div>
+          )}
           <input
-            id="photo_url"
-            type="url"
-            value={photoUrl || ''}
-            onChange={(e) => setPhotoUrl(e.target.value)}
-            disabled={loading}
+            type="file"
+            id="avatar"
+            accept="image/*"
+            onChange={(e) => setAvatarFile(e.target.files[0])}
+            disabled={uploading || loading}
           />
+          {avatarFile && (
+            <p className="selected-file-name">Fichier sélectionné: {avatarFile.name}</p>
+          )}
+          <button
+            type="button"
+            onClick={uploadAvatar}
+            disabled={uploading || loading || !avatarFile}
+            className="upload-button"
+          >
+            {uploading ? 'Téléchargement...' : 'Télécharger la photo'}
+          </button>
         </div>
-        <button type="submit" disabled={loading}>
+        <button type="submit" disabled={loading || uploading}>
           {loading ? 'Chargement...' : 'Mettre à jour le profil'}
         </button>
       </form>
